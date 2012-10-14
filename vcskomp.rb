@@ -38,14 +38,23 @@ option_parser = OptionParser.new do |opts|
 
   options[:files] = Array.new
   opts.on('-f','--file FILE',Array,'Define the file/files you want to diff',
-      '(you can use it more than once',
-      'or seperate the filenames with commas)') do |f|
+      "(#{avail_sys.join(',')})",
+      "if not given, #{opts.program_name} tries to automatically detect it") do |f|
     options[:files]+=f
   end
 
+  avail_sys = %w[svn hg git]
+  opts.on('-s','--system NAME',avail_sys,
+          'Define the version control system you are using',
+          '(you can use it more than once',
+          'or seperate the filenames with commas)') do |s|
+    options[:sys]=s
+  end
+
+  
   opts.separator ''
   opts.separator 'Diff options:'
-  opts.separator 'All diff options are passed to svn diff'
+  opts.separator 'All diff options are passed to svn/git/hg diff'
   opts.separator ''
   opts.separator 'Common options:'
 
@@ -62,29 +71,35 @@ rescue OptionParser::InvalidOption, OptionParser::MissingArgument
   exit 1;
 end
 
+if options[:sys].length == 0
+#   TODO: implement auto detection
+  options[:sys]="svn"
+end
+
 # if the user didn't specify any arguments go through each file in the directory
-if options[:files].length==0
-  modified=%x[svn st 2> /dev/null | grep -e "^[MU]" | awk '{print $2}']
+if options[:files].length == 0
+#   FIXME: works only for svn and hg like this
+  modified=%x[#{options[:sys]} status 2> /dev/null | grep -e "^[MU]" | awk '{print $2}']
   modified.split(%r[\n]).each do |f|
     options[:files].push(f) if File.file?(f)
   end
 end
 
 patch="/tmp/svnkomp_747_patch"
-onsvn=""
+remote=""
 
 options[:files].each do |f|
-  onsvn="/tmp/"+f
-  %x[cp #{f} #{onsvn}]
-  %x[svn diff #{ARGV.join(" ")} #{f} > #{patch}]
+  remote="/tmp/"+f
+  %x[cp #{f} #{remote}]
+  %x[#{options[:sys]} diff #{ARGV.join(" ")} #{f} > #{patch}]
   if !($?.success?)
     exit 1;
   end
-  %x[patch -R -p0 #{onsvn} #{patch}]
-  %x[kompare #{onsvn} #{f}]
-  File.delete(onsvn)
+  %x[patch -R -p0 #{remote} #{patch}]
+  %x[kompare #{remote} #{f}]
+  File.delete(remote)
 end
 
 at_exit do
-  %x[rm -rf #{onsvn} #{patch}]
+  %x[rm -rf #{remote} #{patch}]
 end
