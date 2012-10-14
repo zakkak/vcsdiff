@@ -2,7 +2,7 @@
 
 ################################################################################
 #                                                                              #
-# File: vcskomp.rb                                                             #
+# File: vcsdiff.rb                                                             #
 #                                   ++++++++++++++++++++++++++++++             #
 # Copyright (C) 2012                + Author:  Foivos S. Zakkak  +             #
 #                                   + Website: foivos.zakkak.net +             #
@@ -38,19 +38,28 @@ option_parser = OptionParser.new do |opts|
 
   options[:files] = Array.new
   opts.on('-f','--file FILE',Array,'Define the file/files you want to diff',
-      "(#{avail_sys.join(',')})",
-      "if not given, #{opts.program_name} tries to automatically detect it") do |f|
+          '(you can use it more than once',
+          'or seperate the filenames with commas)') do |f|
     options[:files]+=f
   end
 
   avail_sys = %w[svn hg git]
   opts.on('-s','--system NAME',avail_sys,
           'Define the version control system you are using',
-          '(you can use it more than once',
-          'or seperate the filenames with commas)') do |s|
+          "(#{avail_sys.join(',')})",
+          "if not given, #{opts.program_name} tries to automatically detect it"
+          ) do |s|
     options[:sys]=s
   end
 
+  avail_diff = %w[vimdiff kompare]
+  options[:diff]="vimdiff"
+  opts.on('-t','--tool NAME',avail_diff,
+          'Define the prefered diff visualization tool',
+          "(#{avail_diff.join(',')})",
+          'defaults to vimdiff') do |t|
+    options[:diff]=t
+  end
   
   opts.separator ''
   opts.separator 'Diff options:'
@@ -96,7 +105,7 @@ options[:files].each do |f|
     exit 1;
   end
   %x[patch -R -p0 #{remote} #{patch}]
-  %x[kompare #{remote} #{f}]
+  %x[#{options[:diff]} #{remote} #{f}]
   File.delete(remote)
 end
 
