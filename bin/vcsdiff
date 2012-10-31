@@ -2,7 +2,7 @@
 
 ################################################################################
 #                                                                              #
-# File: vcsdiff.rb                                                             #
+# File: vcsdiff                                                                #
 #                                   ++++++++++++++++++++++++++++++             #
 # Copyright (C) 2012                + Author:  Foivos S. Zakkak  +             #
 #                                   + Website: foivos.zakkak.net +             #
@@ -28,7 +28,6 @@
 ################################################################################
 
 require 'optparse'
-require 'ftools'
 
 options = {}
 option_parser = OptionParser.new do |opts|
@@ -80,8 +79,8 @@ rescue OptionParser::InvalidOption, OptionParser::MissingArgument
   exit 1;
 end
 
-if options[:sys].length == 0
-#   TODO: implement auto detection
+if not options[:sys]
+  #   TODO: implement auto detection
   options[:sys]="svn"
 end
 
@@ -99,13 +98,16 @@ remote=""
 
 options[:files].each do |f|
   remote="/tmp/"+f
+  dir=File.dirname(remote)
+  Dir.mkdir(dir) unless File.exists?(dir)
   %x[cp #{f} #{remote}]
   %x[#{options[:sys]} diff #{ARGV.join(" ")} #{f} > #{patch}]
   if !($?.success?)
+    puts %'Error: #{options[:sys]} diff #{ARGV.join(" ")} #{f} > #{patch} failed'
     exit 1;
   end
   %x[patch -R -p0 #{remote} #{patch}]
-  %x[#{options[:diff]} #{remote} #{f}]
+  %x[#{options[:diff]} #{remote} #{f} < `tty` > `tty`]
   File.delete(remote)
 end
 
