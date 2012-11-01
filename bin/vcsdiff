@@ -99,7 +99,7 @@ remote=""
 options[:files].each do |f|
   remote="/tmp/"+f
   dir=File.dirname(remote)
-  Dir.mkdir(dir) unless File.exists?(dir)
+  Dir.mkdir_p(dir) unless File.exists?(dir)
   %x[cp #{f} #{remote}]
   %x[#{options[:sys]} diff #{ARGV.join(" ")} #{f} > #{patch}]
   if !($?.success?)
