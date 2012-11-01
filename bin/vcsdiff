@@ -28,6 +28,7 @@
 ################################################################################
 
 require 'optparse'
+require 'fileutils'
 
 options = {}
 option_parser = OptionParser.new do |opts|
