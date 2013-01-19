@@ -37,9 +37,10 @@ option_parser = OptionParser.new do |opts|
   opts.separator 'Options'
 
   options[:files] = Array.new
-  opts.on('-f','--file FILE',Array,'Define the file/files you want to diff',
+  opts.on('-f','--file FILE[,FILE]',Array,'Define the file/files you want to diff',
           '(you can use it more than once',
-          'or seperate the filenames with commas)') do |f|
+          'or seperate the filenames with commas)',
+          'If not specified vcsdiff diffs all files in the directory') do |f|
     options[:files]+=f
   end
 
@@ -60,7 +61,13 @@ option_parser = OptionParser.new do |opts|
           'defaults to vimdiff') do |t|
     options[:diff]=t
   end
-  
+
+  options[:verbose]=false
+  opts.on('-v','--verbose',
+          'Enable verbose printing') do
+    options[:verbose]=true
+  end
+
   opts.separator ''
   opts.separator 'Diff options:'
   opts.separator 'All diff options are passed to svn/git/hg diff'
@@ -81,16 +88,49 @@ rescue OptionParser::InvalidOption, OptionParser::MissingArgument
 end
 
 if not options[:sys]
-  #   TODO: implement auto detection
-  options[:sys]="svn"
+  # Check if it is a svn repository
+  %x[svn info 2> /dev/null]
+  if ($?.success?)
+    options[:sys]="svn"
+  end
+end
+
+if not options[:sys]
+  # Check if it is a git repository
+  %x[git status 2> /dev/null]
+  if ($?.success?)
+    options[:sys]="git"
+  end
+end
+
+if not options[:sys]
+  # Check if it is a svn repository
+  %x[hg status 2> /dev/null]
+  if ($?.success?)
+    options[:sys]="hg"
+  end
+end
+
+if options[:verbose]
+  puts 'Auto-detected ' + options[:sys] + ' version control'
 end
 
 # if the user didn't specify any arguments go through each file in the directory
 if options[:files].length == 0
-#   FIXME: works only for svn and hg like this
-  modified=%x[#{options[:sys]} status 2> /dev/null | grep -e "^[MU]" | awk '{print $2}']
+  if options[:sys].eql? "git"
+    modified=%x[#{options[:sys]} status 2> /dev/null | grep modified | awk '{print $3}']
+  else
+    modified=%x[#{options[:sys]} status 2> /dev/null | grep -e "^[MU]" | awk '{print $2}']
+  end
   modified.split(%r[\n]).each do |f|
     options[:files].push(f) if File.file?(f)
+  end
+end
+
+if options[:verbose]
+  puts 'Files that are going to be diffed:'
+  options[:files].each do |f|
+    puts "  " + f
   end
 end
 
@@ -108,7 +148,7 @@ options[:files].each do |f|
     exit 1;
   end
   %x[patch -R -p0 #{remote} #{patch}]
-  %x[#{options[:diff]} #{remote} #{f} < `tty` > `tty`]
+  %x[#{options[:diff]} #{f} #{remote} < `tty` > `tty`]
   File.delete(remote)
 end
 
